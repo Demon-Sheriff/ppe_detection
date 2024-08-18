@@ -1,44 +1,61 @@
 import os
+import random
 import shutil
 import argparse
-from sklearn.model_selection import train_test_split
 
-def split_dataset(input_dir, output_dir, test_size=0.2, valid_size=0.2):
-    images_dir = os.path.join(input_dir, 'images')
-    labels_dir = os.path.join(input_dir, 'labels')
-
+def split_dataset(image_dir, label_dir, output_dir, train_ratio=0.8):
     # Create output directories
-    os.makedirs(os.path.join(output_dir, 'train/images'), exist_ok=True)
-    os.makedirs(os.path.join(output_dir, 'train/labels'), exist_ok=True)
-    os.makedirs(os.path.join(output_dir, 'valid/images'), exist_ok=True)
-    os.makedirs(os.path.join(output_dir, 'valid/labels'), exist_ok=True)
-    os.makedirs(os.path.join(output_dir, 'test/images'), exist_ok=True)
-    os.makedirs(os.path.join(output_dir, 'test/labels'), exist_ok=True)
+    train_images_dir = os.path.join(output_dir, 'train/images')
+    val_images_dir = os.path.join(output_dir, 'val/images')
+    train_labels_dir = os.path.join(output_dir, 'train/labels')
+    val_labels_dir = os.path.join(output_dir, 'val/labels')
 
-    # Get list of image files
-    image_files = [f for f in os.listdir(images_dir) if os.path.isfile(os.path.join(images_dir, f))]
-    image_files.sort()
+    os.makedirs(train_images_dir, exist_ok=True)
+    os.makedirs(val_images_dir, exist_ok=True)
+    os.makedirs(train_labels_dir, exist_ok=True)
+    os.makedirs(val_labels_dir, exist_ok=True)
 
-    # Split the dataset
-    train_files, temp_files = train_test_split(image_files, test_size=test_size, random_state=42)
-    valid_files, test_files = train_test_split(temp_files, test_size=test_size / (test_size + valid_size), random_state=42)
+    # Get list of all images
+    images = [f for f in os.listdir(image_dir) if f.endswith('.jpg')]
 
-    def copy_files(file_list, destination_folder):
-        for file in file_list:
-            # Copy images
-            shutil.copy(os.path.join(images_dir, file), os.path.join(destination_folder, 'images', file))
-            # Copy corresponding annotations
-            label_file = os.path.splitext(file)[0] + '.txt'
-            label_file_path = os.path.join(labels_dir, label_file)
-            if os.path.exists(label_file_path):
-                shutil.copy(label_file_path, os.path.join(destination_folder, 'labels', label_file))
+    # Shuffle the images to ensure random split
+    random.shuffle(images)
+
+    # Split the data
+    train_size = int(len(images) * train_ratio)
+    train_images = images[:train_size]
+    val_images = images[train_size:]
+
+    def copy_files(image_list, images_dir, labels_dir, output_images_dir, output_labels_dir):
+        for image in image_list:
+            image_path = os.path.join(images_dir, image)
+            label_path = os.path.join(labels_dir, image.replace('.jpg', '.txt'))
+            
+            # Check if image exists
+            if not os.path.isfile(image_path):
+                print(f"Warning: Image file {image_path} does not exist.")
+                continue
+            
+            # Copy image
+            shutil.copy(image_path, os.path.join(output_images_dir, image))
+            
+            # Check if label file exists
+            if os.path.isfile(label_path):
+                # Copy label
+                shutil.copy(label_path, os.path.join(output_labels_dir, image.replace('.jpg', '.txt')))
             else:
-                print(f"Warning: Label file {label_file} not found for {file}")
+                print(f"Warning: Label file {label_path} does not exist.")
 
-    # Copy files to respective folders
-    copy_files(train_files, os.path.join(output_dir, 'train'))
-    copy_files(valid_files, os.path.join(output_dir, 'valid'))
-    copy_files(test_files, os.path.join(output_dir, 'test'))
+    # Copy files to the respective directories
+    copy_files(train_images, image_dir, label_dir, train_images_dir, train_labels_dir)
+    copy_files(val_images, image_dir, label_dir, val_images_dir, val_labels_dir)
+
+    print(f"Training set: {len(train_images)} images")
+    print(f"Validation set: {len(val_images)} images")
+
+# Example usage
+# split_dataset('/content/drive/MyDrive/datasets/images', '/content/drive/MyDrive/datasets/yolo_labels', '/content/drive/MyDrive/data')
+
 
 def main():
     parser = argparse.ArgumentParser(description="Split dataset into train, valid, and test sets.")

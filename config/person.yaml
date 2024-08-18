@@ -1,10 +1,12 @@
-# person_detection.yaml
+# YAML configuration file for YOLOv8 training
 
-train: C:\\Users\\Anant Shukla\\Desktop\\Object_Detection\\data\\train
-val: C:\\Users\\Anant Shukla\\Desktop\\Object_Detection\\data\\val
+# Path to your training and validation datasets
+train: /content/drive/MyDrive/data/train  # Path to training images
+val: /content/drive/MyDrive/data/val    # Path to validation images
 
-# Number of classes
+# Number of classes (only 'person' class in this case)
 nc: 1
 
-# Class names
-names: ['person']
+# List of class names
+names:
+  0: 'person'
