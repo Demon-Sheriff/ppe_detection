@@ -1,0 +1,10 @@
+# person_detection.yaml
+
+train: C:\\Users\\Anant Shukla\\Desktop\\Object_Detection\\data\\train
+val: C:\\Users\\Anant Shukla\\Desktop\\Object_Detection\\data\\val
+
+# Number of classes
+nc: 1
+
+# Class names
+names: ['person']
