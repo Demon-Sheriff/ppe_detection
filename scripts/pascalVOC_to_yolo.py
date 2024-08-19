@@ -1,54 +1,67 @@
-import os
 import xml.etree.ElementTree as ET
+import os
 import argparse
 
-def convert_pascal_voc_to_yolo(voc_dir, output_dir, classes_file):
-    with open(classes_file, 'r') as f:
-        class_names = f.read().splitlines()
+# def print_tree(element, level=0):
+#     print("  " * level + element.tag)
+#     for child in element:
+#         print_tree(child, level + 1)
 
-    os.makedirs(output_dir, exist_ok=True)
+def get_size_props(root):
+    size = root.find('size')
+    if size is not None:
+        w = size.find('width').text
+        h = size.find('height').text
+        d = size.find('depth').text
+    else:
+        print("Size information in file not found")
+        return None
+    return int(w), int(h), int(d)
 
-    for file in os.listdir(voc_dir):
-        if file.endswith('.xml'):
-            tree = ET.parse(os.path.join(voc_dir, file))
+def convert_bbox(x1, y1, x2, y2, w, h):
+    return [(x2 + x1)/(2*w), (y2 + y1)/(2*h), (x2 - x1)/w, (y2 - y1)/h]
+
+def get_class_props(root, output_file):
+    classes = ['person', 'hard-hat', 'gloves', 'mask', 'glasses', 'boots', 'vest', 'ppe-suit', 'ear-protector', 'safety-harness']
+    w, h, _ = get_size_props(root)
+    
+    with open(output_file, 'w') as f:
+        for obj in root.findall('object'):
+            name = obj.find('name').text
+            if name in classes:
+                class_id = classes.index(name)
+                bndbox = obj.find('bndbox')
+                xmin = float(bndbox.find('xmin').text)
+                ymin = float(bndbox.find('ymin').text)
+                xmax = float(bndbox.find('xmax').text)
+                ymax = float(bndbox.find('ymax').text)
+                
+                # Convert to YOLO format
+                bbox = convert_bbox(xmin, ymin, xmax, ymax, w, h)
+                
+                # Write to file
+                f.write(f"{class_id} {bbox[0]:.6f} {bbox[1]:.6f} {bbox[2]:.6f} {bbox[3]:.6f}\n")
+
+def process_directory(input_dir, output_dir):
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    for filename in os.listdir(input_dir):
+        if filename.endswith('.xml'):
+            input_path = os.path.join(input_dir, filename)
+            output_path = os.path.join(output_dir, filename[:-4] + '.txt')
+
+            tree = ET.parse(input_path)
             root = tree.getroot()
-            size = root.find('size')
-            width = int(size.find('width').text)
-            height = int(size.find('height').text)
 
-            with open(os.path.join(output_dir, file.replace('.xml', '.txt')), 'w') as f_out:
-                for obj in root.iter('object'):
-                    cls = obj.find('name').text
-                    if cls != 'person':  # Only include 'person' class
-                        continue
-                    if cls not in class_names:
-                        print(f"Warning: Class '{cls}' not found in classes file.")
-                        continue
-                    cls_id = class_names.index(cls)
-                    xmlbox = obj.find('bndbox')
-                    b = (float(xmlbox.find('xmin').text), float(xmlbox.find('xmax').text),
-                         float(xmlbox.find('ymin').text), float(xmlbox.find('ymax').text))
-                    bb = convert_bbox((width, height), b)
-                    f_out.write(f"{cls_id} " + " ".join([f"{a:.6f}" for a in bb]) + '\n')
-
-def convert_bbox(size, box):
-    dw = 1. / size[0]
-    dh = 1. / size[1]
-    x_center = (box[0] + box[1]) / 2.0
-    y_center = (box[2] + box[3]) / 2.0
-    w = box[1] - box[0]
-    h = box[3] - box[2]
-    x_center = x_center * dw
-    y_center = y_center * dh
-    w = w * dw
-    h = h * dh
-    return (x_center, y_center, w, h)
+            get_class_props(root, output_path)
+            print(f"Converted {filename} to {os.path.basename(output_path)}")
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Convert PascalVOC to YOLOv8 format.")
-    parser.add_argument('input_dir', type=str, help="Directory with PascalVOC annotation XML files")
-    parser.add_argument('output_dir', type=str, help="Directory to save YOLOv8 annotation files")
-    parser.add_argument('classes_file', type=str, help="classes file containing the classes")
+    parser = argparse.ArgumentParser(description="Convert Pascal VOC XML to YOLO txt format")
+    parser.add_argument("input_dir", help="Input directory containing Pascal VOC XML files")
+    parser.add_argument("output_dir", help="Output directory for YOLO txt files")
     args = parser.parse_args()
 
-    convert_pascal_voc_to_yolo(args.input_dir, args.output_dir, args.classes_file)
+    process_directory(args.input_dir, args.output_dir)
+    print("Conversion complete.")
